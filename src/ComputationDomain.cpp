@@ -25,7 +25,7 @@ Computation::Computation()
     setupMetaModel();
 }
 
-Computation::Computation(const Hardware::Computational::Network& base)
+Computation::Computation(const Hypergraph& base)
 : Hardware::Computational::Network(base)
 {
     setupMetaModel();
@@ -66,6 +66,7 @@ std::string Computation::domainSpecificExport(const UniqueId& uid)
     // So, what do different versions mean? It is some form of sublassing.
     // So on toplvl is the component NAME ... The version name should be used as UID!
     // Then we can easily differentiate between different components
+    // TODO: Consider going through all subclasses of that component and for each creating a new version!
     YAML::Node versionsYAML(spec["versions"]);
     YAML::Node versionYAML;
     versionYAML["name"] = uid;
@@ -111,7 +112,9 @@ bool Computation::domainSpecificImport(const std::string& serialized)
     for (auto it = versions.begin(); it != versions.end(); it++)
     {
         const YAML::Node& version(*it);
-        const std::string& vname(version["name"].as<std::string>()); // Use version name as UID!!!
+        // Use version name as UID!!!
+        // TODO: Consider using subclassing instead!!! Then we don't miss the oportunity to encode e.g. location in UID!!!
+        const std::string& vname(version["name"].as<std::string>());
         // TODO: What about:
         // const std::string& vdate(version["date"]);
         // Create a component for every version

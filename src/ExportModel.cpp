@@ -59,11 +59,7 @@ int main (int argc, char **argv)
     // Load file and convert to Drock::Computaution model
     // TODO: Every class should have a constructor from Hypergraph!!!
     Hypergraph* hg = YAML::LoadFile(fileNameIn).as<Hypergraph*>();
-    Conceptgraph cg(*hg);
-    CommonConceptGraph ccg(cg);
-    Component::Network cn(ccg);
-    Hardware::Computational::Network hcn(cn);
-    Drock::Computation dc(hcn);
+    Drock::Computation dc(*hg);
 
     // Call domain specific export
     std::size_t pos(fileNameOut.rfind("."));

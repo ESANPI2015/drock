@@ -9,7 +9,7 @@ class Computation : public Hardware::Computational::Network
 {
     public:
         Computation();
-        Computation(const Hardware::Computational::Network& base);
+        Computation(const Hypergraph& base);
         ~Computation();
 
         std::string domainSpecificExport(const UniqueId& uid);
