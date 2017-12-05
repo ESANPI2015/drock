@@ -30,6 +30,7 @@ add_definitions(${drock_PKGCONFIG_CFLAGS_OTHER} -ggdb --pedantic -Wall -std=c++1
 set(SOURCES
     src/ComputationDomain.cpp
     src/ImportModel.cpp
+    src/ExportModel.cpp
     )
 set(HEADERS
     include/ComputationDomain.hpp
@@ -46,6 +47,11 @@ target_link_libraries(drock
 add_executable(drock-import-model src/ImportModel.cpp)
 target_link_libraries(drock-import-model drock)
 install(TARGETS drock-import-model
+RUNTIME DESTINATION bin)
+
+add_executable(drock-export-model src/ExportModel.cpp)
+target_link_libraries(drock-export-model drock)
+install(TARGETS drock-export-model
 RUNTIME DESTINATION bin)
 
 # pkg-config, to be installed:

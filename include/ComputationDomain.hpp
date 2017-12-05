@@ -9,10 +9,13 @@ class Computation : public Hardware::Computational::Network
 {
     public:
         Computation();
+        Computation(const Hardware::Computational::Network& base);
         ~Computation();
 
-        std::string domainSpecificExport();
+        std::string domainSpecificExport(const UniqueId& uid);
         bool domainSpecificImport(const std::string& serialized);
+    protected:
+        void setupMetaModel();
 };
 
 }
