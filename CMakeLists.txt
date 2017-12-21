@@ -23,9 +23,11 @@ pkg_check_modules(drock_PKGCONFIG REQUIRED
     hypergraph domaingraph yaml-cpp
     )
 
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
+set(CMAKE_CXX_STANDARD 11)
 include_directories(${drock_PKGCONFIG_INCLUDE_DIRS})
 link_directories(${drock_PKGCONFIG_LIBRARY_DIRS})
-add_definitions(${drock_PKGCONFIG_CFLAGS_OTHER} -ggdb --pedantic -Wall -std=c++11)
+add_definitions(${drock_PKGCONFIG_CFLAGS_OTHER} --pedantic -Wall)
 
 set(SOURCES
     src/ComputationDomain.cpp
