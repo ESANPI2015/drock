@@ -10,9 +10,9 @@ SET(ENV{PKG_CONFIG_PATH}
     )
 
 # Yes, we have to add the directory at least
-if(NOT TARGET domaingraph)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../domaingraph domaingraph)
-endif(NOT TARGET domaingraph)
+if(NOT TARGET componentnet)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../componentnet componentnet)
+endif(NOT TARGET componentnet)
 if(NOT TARGET hypergraph)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../hypergraph hypergraph)
 endif(NOT TARGET hypergraph)
@@ -20,7 +20,7 @@ endif(NOT TARGET hypergraph)
 find_package(PkgConfig)
 
 pkg_check_modules(drock_PKGCONFIG REQUIRED
-    hypergraph domaingraph yaml-cpp
+    hypergraph componentnet yaml-cpp
     )
 
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
@@ -30,7 +30,8 @@ link_directories(${drock_PKGCONFIG_LIBRARY_DIRS})
 add_definitions(${drock_PKGCONFIG_CFLAGS_OTHER} --pedantic -Wall)
 
 set(SOURCES
-    src/ComputationDomain.cpp
+    src/BasicModel.cpp
+    #src/ComputationDomain.cpp
     src/ImportModel.cpp
     src/ExportModel.cpp
     )

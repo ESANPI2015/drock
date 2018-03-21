@@ -1,4 +1,4 @@
-#include "ComputationDomain.hpp"
+#include "BasicModel.hpp"
 #include "HyperedgeYAML.hpp"
 
 #include <iostream>
@@ -66,7 +66,7 @@ int main (int argc, char **argv)
     ss << fin.rdbuf();
 
     // Call domain specific import
-    Drock::Computation dc;
+    Drock::Model dc;
     dc.domainSpecificImport(ss.str());
 
     // Store imported graph

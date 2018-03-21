@@ -1,4 +1,4 @@
-#include "ComputationDomain.hpp"
+#include "BasicModel.hpp"
 #include "HyperedgeYAML.hpp"
 
 #include <iostream>
@@ -57,9 +57,8 @@ int main (int argc, char **argv)
     std::string fileNameOut(argv[optind+1]);
 
     // Load file and convert to Drock::Computaution model
-    // TODO: Every class should have a constructor from Hypergraph!!!
     Hypergraph* hg = YAML::LoadFile(fileNameIn).as<Hypergraph*>();
-    Drock::Computation dc(*hg);
+    Drock::Model dc(*hg);
 
     // Call domain specific export
     std::size_t pos(fileNameOut.rfind("."));
