@@ -1,5 +1,5 @@
 #include "BasicModel.hpp"
-#include "HyperedgeYAML.hpp"
+#include "HypergraphYAML.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -61,6 +61,7 @@ int main (int argc, char **argv)
     fin.open(fileNameIn);
     if(!fin.good()) {
         std::cout << "READ FAILED\n";
+        return 2;
     }
     std::stringstream ss;
     ss << fin.rdbuf();
@@ -74,10 +75,9 @@ int main (int argc, char **argv)
     fout.open(fileNameOut);
     if(!fout.good()) {
         std::cout << "WRITE FAILED\n";
+        return 3;
     }
-    YAML::Node test;
-    test = static_cast<Hypergraph*>(&dc);
-    fout << test;
+    fout << YAML::StringFrom(dc) << std::endl;
     fout.close();
     fin.close();
 
