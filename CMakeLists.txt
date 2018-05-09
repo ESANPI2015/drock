@@ -10,12 +10,15 @@ SET(ENV{PKG_CONFIG_PATH}
     )
 
 # Yes, we have to add the directory at least
-if(NOT TARGET componentnet)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../componentnet componentnet)
-endif(NOT TARGET componentnet)
 if(NOT TARGET hypergraph)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../hypergraph hypergraph)
 endif(NOT TARGET hypergraph)
+if(NOT TARGET componentnet)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../componentnet componentnet)
+endif(NOT TARGET componentnet)
+if(NOT TARGET yaml-cpp)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../ext/yaml-cpp yaml-cpp)
+endif(NOT TARGET yaml-cpp)
 
 find_package(PkgConfig)
 
