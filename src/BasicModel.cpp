@@ -5,6 +5,13 @@
 
 namespace Drock {
 
+const UniqueId Model::DomainId = "Drock::Model::Domain";
+const UniqueId Model::ComponentId = "Drock::Model::Component";
+const UniqueId Model::ComponentTypeId = "Drock::Model::Component::Type";
+const UniqueId Model::InterfaceId = "Drock::Model::Interface";
+const UniqueId Model::InterfaceDirectionId = "Drock::Model::Interface::Direction";
+const UniqueId Model::InterfaceTypeId = "Drock::Model::Interface::Type";
+
 void Model::setupMetaModel()
 {
     // Setup meta model
@@ -12,20 +19,20 @@ void Model::setupMetaModel()
     // NOT model the classes in the system_modelling library
     
     // The domain specifies to which view a component belongs
-    // For example a 'Task' belongs to the 'SOFTWARE' domain
-    // This meta component holds all domains
-    createComponent("Drock::Model::Domain", "DOMAIN");
+    // It is a class but not a component class!
+    create(Model::DomainId, "Domain");
 
-    // Predefine some domains we already know
-    createComponent("Drock::Model::Domain::SOFTWARE", "SOFTWARE", Hyperedges{"Drock::Model::Domain"});
-    createComponent("Drock::Model::Domain::COMPUTATION", "COMPUTATION", Hyperedges{"Drock::Model::Domain"});
+    // Create a meta component class for DROCK components
+    createComponent(Model::ComponentId, "Component");
+    createComponent(Model::ComponentTypeId, "Type", Hyperedges{Model::ComponentId});
+    // TODO: Versions?
 
-    // TODO: Here we could also define the main component classes we already know
-    // HARDWARE: Device, Processor, Bus etc.
-    // SOFTWARE: Task, Port etc.
+    // Create a meta interface class for DROCK interfaces
+    createInterface(Model::InterfaceId, "Interface");
+    createInterface(Model::InterfaceDirectionId, "Direction", Hyperedges{Model::InterfaceId});
+    createInterface(Model::InterfaceTypeId, "Type", Hyperedges{Model::InterfaceId});
 
-    // Create a meta component class for interfaces
-    createInterface("Drock::Model::Interface", "Interface");
+    // TODO: Do we need more? e.g. Configuration, Connector etc?
 }
 
 Model::Model()
@@ -43,120 +50,118 @@ Model::~Model()
 {
 }
 
-std::string Model::domainFromLabel(const std::string& label)
+UniqueId Model::getDomainUid(const std::string& domain)
 {
-    std::size_t pos = label.find("::");
-    return label.substr(0,pos);
+    return Model::DomainId+"::"+domain;
 }
 
-std::string Model::typeFromLabel(const std::string& label)
+UniqueId Model::getTypeUid(const std::string& type)
 {
-    std::size_t pos1 = label.find("::");
-    std::size_t pos2 = label.find("::", pos1+2);
-    return pos2 > pos1+2 ? label.substr(pos1+2, pos2-pos1-2) : std::string();
+    return Model::ComponentTypeId+"::"+type;
 }
 
-std::string Model::nameFromLabel(const std::string& label)
+UniqueId Model::getComponentUid(const std::string& domain, const std::string& name, const std::string& version)
 {
-    std::size_t pos1 = label.find("::");
-    std::size_t pos2 = label.find("::", pos1+2);
-    std::size_t pos3 = label.find("::", pos2+2);
-    return pos3 > pos2+2 ? label.substr(pos2+2, pos3-pos2-2) : std::string();
+    return version.empty() ? (Model::ComponentId+"::"+domain+"::"+name) : (Model::ComponentId+"::"+domain+"::"+name+"::"+version);
 }
 
-std::string Model::versionFromLabel(const std::string& label)
+UniqueId Model::getInterfaceUid(const std::string& type, const std::string& direction)
 {
-    std::size_t pos1 = label.find("::");
-    std::size_t pos2 = label.find("::", pos1+2);
-    std::size_t pos3 = label.find("::", pos2+2);
-    return pos3 < std::string::npos ? label.substr(pos3+2) : std::string();
-}
-
-std::string Model::labelFrom(const std::string& domain, const std::string& type, const std::string& name, const std::string& version)
-{
-    std::string label;
-    if (domain.empty())
-        return label;
-    label = domain;
-    if (type.empty())
-        return label;
-    label += "::"+type;
-    if (name.empty())
-        return label;
-    label += "::"+name;
-    if (version.empty())
-        return label;
-    return label+"::"+version;
-}
-
-std::string Model::interfaceTypeFromLabel(const std::string& label)
-{
-    std::size_t pos = label.find("::");
-    return label.substr(0,pos);
-}
-
-std::string Model::interfaceDirectionFromLabel(const std::string& label)
-{
-    std::size_t pos = label.find("::");
-    return pos < std::string::npos ? label.substr(pos+2) : std::string();
-}
-
-std::string Model::interfaceLabelFrom(const std::string& type, const std::string& direction)
-{
-    std::string label;
-    if (type.empty())
-        return label;
-    label = type;
-    if (direction.empty())
-        return label;
-    return label+"::"+direction;
+    bool valid = false;
+    std::string uid(Model::InterfaceId);
+    if (!type.empty())
+    {
+        uid = uid+"::"+type;
+        valid = true;
+    }
+    if (!direction.empty())
+    {
+        uid = uid+"::"+direction;
+        valid = true;
+    }
+    return valid ? uid : "";
 }
 
 bool Model::domainSpecificImport(const std::string& serialized)
 {
     YAML::Node spec = YAML::Load(serialized);
 
-    // TODO: Actually we want to compose only the UID, the label should be short!
-    // Handle domain
+    // Handle domain, type, name
     if (!spec["domain"].IsDefined())
         return false;
     const std::string domain(spec["domain"].as<std::string>());
-    // Create a new meta component (if not already there!)
-    const UniqueId domainUid("Drock::Model::Domain::"+labelFrom(domain));
-    createComponent(domainUid, labelFrom(domain), Hyperedges{"Drock::Model::Domain"});
-
-    // Handle domain specific type
     if (!spec["type"].IsDefined())
         return false;
     const std::string type(spec["type"].as<std::string>());
-    // Create or find a new meta component in the selected domain
-    const UniqueId typeUid("Drock::Model::Domain::"+labelFrom(domain, type));
-    Hyperedges super(componentClasses(labelFrom(domain, type), Hyperedges{domainUid}));
-    if (super.empty())
-    {
-        // Create new meta model
-        super = createComponent(typeUid, labelFrom(domain, type), Hyperedges{domainUid});
-    }
-
-    // Handle name
     if (!spec["name"].IsDefined())
         return false;
     const std::string name(spec["name"].as<std::string>());
 
+    // Create domain
+    // NOTE: For now the domain is related to subsequent components via IS-A relationship
+    const UniqueId domainUid(getDomainUid(domain));
+    createSubclassOf(domainUid, Hyperedges{Model::DomainId}, domain);
+    // Create type
+    const UniqueId typeUid(getTypeUid(type));
+    createComponent(typeUid, type, Hyperedges{Model::ComponentTypeId});
+    // Create a component by name which is a subclass of both a domain and a type
+    const UniqueId superUid(getComponentUid(domain, name));
+    createComponent(superUid, name, Hyperedges{typeUid});
+    isA(Hyperedges{superUid}, Hyperedges{domainUid});
     // For each of the versions we have to create a new component
+    // The question is: Do we create a subclass for each version? Or do we just use names?
+    // We should do the former.
     if (!spec["versions"].IsDefined())
         return false;
     const YAML::Node& versions(spec["versions"]);
     for (auto it = versions.begin(); it != versions.end(); it++)
     {
-        // Create model for the (domain, type, name, vname) tupel
+        // Create a subclass of superUid with label (name, vname)
         const YAML::Node& version(*it);
         const std::string& vname(version["name"].as<std::string>());
-        const UniqueId modelUid("Drock::Model::Domain::"+labelFrom(domain, type, name, vname));
-        Hyperedges newModelUid(createComponent(modelUid,labelFrom(domain, type, name, vname),super));
+        const UniqueId modelUid(getComponentUid(domain, name, vname));
+        createComponent(modelUid, vname, Hyperedges{superUid});
+
+        // TODO: Handle subcomponents & their interconnection. Create only if non-existing.
+        const YAML::Node& components(version["components"]);
+        if (components.IsDefined())
+        {
+            Hyperedges validNodeUids;
+            const YAML::Node& nodes(components["nodes"]);
+            if (nodes.IsDefined())
+            {
+                for (auto nit = nodes.begin(); nit != nodes.end(); nit++)
+                {
+                    const YAML::Node& node(*nit);
+                    const std::string& nodeName(node["name"].as<std::string>());
+                    const std::string& nodeModelName(node["model"]["name"].as<std::string>());
+                    const std::string& nodeModelDomain(node["model"]["domain"].as<std::string>());
+                    const std::string& nodeModelVersion(node["model"]["version"].as<std::string>());
+
+                    // Check if a node with the same name already exists in partUids
+                    // Here we could make an optimization!!!
+                    Hyperedges partUids(componentsOf(Hyperedges{modelUid}, nodeName));
+                    if (!partUids.size())
+                    {
+                        // Instantiate new subcomponent
+                        // We need to find a component class named <nodeModelVersion> whose superclass is <nodeModelName> and its domain is <nodeModelDomain>
+                        const UniqueId templateUid(getComponentUid(nodeModelDomain, nodeModelName, nodeModelVersion));
+                        // TODO: Check if we should use instantiateSuperDeepFrom ...
+                        partUids = unite(partUids, instantiateDeepFrom(Hyperedges{templateUid}, nodeName));
+                    }
+                    // Register (possibly new) parts for later use
+                    validNodeUids = unite(validNodeUids, partUids);
+                }
+            }
+            const YAML::Node& edges(components["edges"]);
+            if (edges.IsDefined())
+            {
+            }
+            // TODO: Handle subcomponent config
+        }
 
         // Handle interfaces
-        // TODO: Also, for interfaces we should assemble the UID of the superIf by (type, direction) tupel
+        // TODO: Check if interface is an alias of an INNER interface
         if (version["interfaces"].IsDefined())
         {
             Hyperedges allInterfaces;
@@ -168,24 +173,29 @@ bool Model::domainSpecificImport(const std::string& serialized)
                 const std::string& ifType(interfaceYAML["type"].as<std::string>());
                 const std::string& ifDirection(interfaceYAML["direction"].as<std::string>());
 
-                // Find or create superclass
-                Hyperedges superIf(interfaceClasses(interfaceLabelFrom(ifType, ifDirection), Hyperedges{"Drock::Model::Interface"}));
-                if (superIf.empty())
-                {
-                    superIf = createInterface("Drock::Model::Interface::"+interfaceLabelFrom(ifType, ifDirection), interfaceLabelFrom(ifType, ifDirection), Hyperedges{"Drock::Model::Interface"});
-                }
+                // Create one subclass of Drock::Interface which encodes directionality and one for the type
+                const UniqueId superIfDirUid(getInterfaceUid("",ifDirection));
+                createInterface(superIfDirUid, ifDirection, Hyperedges{Model::InterfaceDirectionId});
+                const UniqueId superIfTypeUid(getInterfaceUid(ifType, ""));
+                createInterface(superIfTypeUid, ifType, Hyperedges{Model::InterfaceTypeId});
+                // While the former classes are independent, the specific interface class from which we instantiate is dependent on BOTH
+                const UniqueId superIfUid(getInterfaceUid(ifType, ifDirection));
+                createInterface(superIfUid, superIfUid, Hyperedges{superIfDirUid, superIfTypeUid});
 
-                // Create interface
-                allInterfaces = unite(allInterfaces, instantiateFrom(superIf, ifName));
+                Hyperedges interfaceUids(interfacesOf(Hyperedges{modelUid}, ifName));
+                if (!interfaceUids.size())
+                {
+                    // Create interface
+                    allInterfaces = unite(allInterfaces, instantiateFrom(superIfUid, ifName));
+                }
             }
             // Attach interfaces to model
-            hasInterface(newModelUid, allInterfaces);
+            hasInterface(Hyperedges{modelUid}, allInterfaces);
         }
 
-        // TODO: Handle subcomponents
-        
-        // TODO: Handle config and other unmodeled stuff!
+        // TODO: Handle other, generic properties
     }
+
     return true;
 }
 
@@ -195,44 +205,89 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
     YAML::Node spec;
     if (!get(uid))
         return std::string();
-    // In the label we should find
-    // * domain
-    spec["domain"] = domainFromLabel(get(uid)->label());
-    // * type
-    spec["type"] = typeFromLabel(get(uid)->label());
-    // * name
-    spec["name"] = nameFromLabel(get(uid)->label());
-    // * version
-    YAML::Node versionsYAML(spec["versions"]);
-    YAML::Node versionYAML;
-    versionYAML["name"] = versionFromLabel(get(uid)->label());
 
-    // Interfaces
-    YAML::Node interfacesYAML(versionYAML["interfaces"]);
-    Hyperedges ifs(interfacesOf(Hyperedges{uid}));
-    for (const UniqueId& ifId : ifs)
+    // Find all superclasses of uid
+    // This includes everything upwards (domain, type, etc.)
+    Hyperedges superUids(subclassesOf(uid, "", TraversalDirection::DOWN));
+
+    // Domains
+    Hyperedges allDomainUids(directSubclassesOf(Hyperedges{Model::DomainId}));
+    Hyperedges domainUids(intersect(superUids, allDomainUids));
+    if (domainUids.size() > 1)
     {
-        YAML::Node interfaceYAML;
-        interfaceYAML["name"] = get(ifId)->label();
-        Hyperedges superIfs(instancesOf(Hyperedges{ifId}, "", TraversalDirection::DOWN));
-        for (const UniqueId& suid : superIfs)
+        std::cout << "Multiple domains found. Abort\n";
+        return ss.str();
+    }
+    if (domainUids.size() < 1)
+    {
+        std::cout << "No domain found. Abort\n";
+        return ss.str();
+    }
+    spec["domain"] = get(*domainUids.begin())->label();
+
+    // Types
+    Hyperedges allTypeUids(directSubclassesOf(Hyperedges{Model::ComponentTypeId}));
+    Hyperedges typeUids(intersect(superUids, allTypeUids));
+    if (typeUids.size() > 1)
+    {
+        std::cout << "Multiple types found. Abort\n";
+        return ss.str();
+    }
+    if (typeUids.size() < 1)
+    {
+        std::cout << "No type found. Abort\n";
+        return ss.str();
+    }
+    spec["type"] = get(*typeUids.begin())->label();
+
+    // Components
+    Hyperedges allComponentUids(directSubclassesOf(typeUids));
+    Hyperedges componentUids(intersect(superUids, allComponentUids));
+    if (componentUids.size() > 1)
+    {
+        std::cout << "Multiple components found. Abort\n";
+        return ss.str();
+    }
+    if (componentUids.size() < 1)
+    {
+        std::cout << "No component found. Abort\n";
+        return ss.str();
+    }
+    spec["name"] = get(*componentUids.begin())->label();
+
+    // For later: Get all interface type and direction uids
+    Hyperedges ifTypeUids(directSubclassesOf(Hyperedges{Model::InterfaceTypeId}));
+    Hyperedges ifDirectionUids(directSubclassesOf(Hyperedges{Model::InterfaceDirectionId}));
+    // Find all versions and cycle through them (if it is a model), TODO: or only export specific one 
+    YAML::Node versionsYAML(spec["versions"]);
+    Hyperedges allVersions(directSubclassesOf(componentUids));
+    for (const UniqueId& versionUid : allVersions)
+    {
+        YAML::Node versionYAML;
+        versionYAML["name"] = get(versionUid)->label();
+
+        // Query interfaces
+        YAML::Node interfacesYAML(versionYAML["interfaces"]);
+        Hyperedges ifs(interfacesOf(Hyperedges{versionUid}));
+        for (const UniqueId& ifId : ifs)
         {
-            const std::string& ifType(interfaceTypeFromLabel(get(suid)->label()));
-            const std::string& ifDirection(interfaceDirectionFromLabel(get(suid)->label()));
-            if (ifType.empty() || ifDirection.empty())
-                continue;
-            interfaceYAML["type"] = ifType;
-            interfaceYAML["direction"] = ifDirection;
-            interfacesYAML.push_back(interfaceYAML);
+            YAML::Node interfaceYAML;
+            interfaceYAML["name"] = get(ifId)->label();
+            Hyperedges superIfs(instancesOf(Hyperedges{ifId}, "", TraversalDirection::DOWN));
+            for (const UniqueId& suid : superIfs)
+            {
+                Hyperedges superSuperIfs(directSubclassesOf(Hyperedges{suid}, "", TraversalDirection::DOWN));
+                interfaceYAML["type"] = get(*(intersect(superSuperIfs, ifTypeUids).begin()))->label();
+                interfaceYAML["direction"] = get(*(intersect(superSuperIfs, ifDirectionUids).begin()))->label();
+                interfacesYAML.push_back(interfaceYAML);
+            }
         }
+        versionsYAML.push_back(versionYAML);
     }
 
     // TODO: Handle subcomponents
 
     // TODO: Handle config and other unmodeled stuff
-
-    // Push version (there will be only one)
-    versionsYAML.push_back(versionYAML);
 
     ss << spec;
     return ss.str();

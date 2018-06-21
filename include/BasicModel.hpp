@@ -15,6 +15,14 @@ namespace Drock {
 class Model : public Component::Network
 {
     public:
+        /* Additional Upper Concepts */
+        static const UniqueId DomainId;
+        static const UniqueId ComponentId;
+        static const UniqueId ComponentTypeId;
+        static const UniqueId InterfaceId;
+        static const UniqueId InterfaceDirectionId;
+        static const UniqueId InterfaceTypeId;
+
         Model();
         Model(const Hypergraph& base);
         ~Model();
@@ -22,17 +30,11 @@ class Model : public Component::Network
         std::string domainSpecificExport(const UniqueId& uid);
         bool domainSpecificImport(const std::string& serialized);
 
-        // Format: domain::type::name::version
-        std::string domainFromLabel(const std::string& label);
-        std::string typeFromLabel(const std::string& label);
-        std::string nameFromLabel(const std::string& label);
-        std::string versionFromLabel(const std::string& label);
-        std::string labelFrom(const std::string& domain="", const std::string& type="", const std::string& name="", const std::string& version="");
-
-        // Format: type::direction
-        std::string interfaceTypeFromLabel(const std::string& label);
-        std::string interfaceDirectionFromLabel(const std::string& label);
-        std::string interfaceLabelFrom(const std::string& type="", const std::string& direction="");
+        // Generate UIDs for fast lookup
+        UniqueId getDomainUid(const std::string& domain);
+        UniqueId getTypeUid(const std::string& type);
+        UniqueId getComponentUid(const std::string& domain, const std::string& name, const std::string& version="");
+        UniqueId getInterfaceUid(const std::string& type, const std::string& direction);
 
     protected:
         void setupMetaModel();
