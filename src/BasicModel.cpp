@@ -146,8 +146,16 @@ bool Model::domainSpecificImport(const std::string& serialized)
                         // Instantiate new subcomponent
                         // We need to find a component class named <nodeModelVersion> whose superclass is <nodeModelName> and its domain is <nodeModelDomain>
                         const UniqueId templateUid(getComponentUid(nodeModelDomain, nodeModelName, nodeModelVersion));
+                        if (!get(templateUid))
+                        {
+                            std::cout << "Cannot find model " << templateUid << " for " << nodeName << "\n";
+                            continue;
+                        }
+                        // TODO: If the template does not exist, shall we just create it without further knowledge?
                         // TODO: Check if we should use instantiateSuperDeepFrom ...
                         partUids = unite(partUids, instantiateDeepFrom(Hyperedges{templateUid}, nodeName));
+                        // Make the new instance part of this model
+                        partOf(partUids, Hyperedges{modelUid});
                     }
                     // Register (possibly new) parts for later use
                     validNodeUids = unite(validNodeUids, partUids);
@@ -211,6 +219,7 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
     Hyperedges superUids(subclassesOf(uid, "", TraversalDirection::DOWN));
 
     // Domains
+    // NOTE: The domain could also be extracted from uid. But we want to be safe and query.
     Hyperedges allDomainUids(directSubclassesOf(Hyperedges{Model::DomainId}));
     Hyperedges domainUids(intersect(superUids, allDomainUids));
     if (domainUids.size() > 1)
@@ -282,10 +291,34 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
                 interfacesYAML.push_back(interfaceYAML);
             }
         }
+
+        // Handle subcomponents
+        YAML::Node componentsYAML(versionYAML["components"]);
+        Hyperedges partUids(componentsOf(Hyperedges{versionUid}));
+        if (partUids.size())
+        {
+            YAML::Node nodesYAML(componentsYAML["nodes"]);
+            for (const UniqueId& partUid : partUids)
+            {
+                YAML::Node nodeYAML;
+                nodeYAML["name"] = get(partUid)->label();
+                // the direct superclass is the model version
+                Hyperedges versionUids(instancesOf(Hyperedges{partUid}, "", TraversalDirection::DOWN));
+                nodeYAML["model"]["version"] = get(*versionUids.begin())->label();
+                // the next superclasses is the model itself (NOTE: get rid of the upper models)
+                Hyperedges modelUids(directSubclassesOf(versionUids, "", TraversalDirection::DOWN));
+                modelUids = subtract(modelUids, Hyperedges{Model::ComponentId, Component::Network::ComponentId});
+                nodeYAML["model"]["name"] = get(*modelUids.begin())->label();
+                // and the next superclasses are the type and the domain
+                Hyperedges modelDomainUids(intersect(directSubclassesOf(modelUids, "", TraversalDirection::DOWN), allDomainUids));
+                nodeYAML["model"]["domain"] = get(*modelDomainUids.begin())->label();
+                nodesYAML.push_back(nodeYAML);
+            }
+            // For every pair of parts, we have to save the relations and interconnections as well.
+        }
+
         versionsYAML.push_back(versionYAML);
     }
-
-    // TODO: Handle subcomponents
 
     // TODO: Handle config and other unmodeled stuff
 
