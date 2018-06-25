@@ -11,6 +11,7 @@ const UniqueId Model::ComponentTypeId = "Drock::Model::Component::Type";
 const UniqueId Model::InterfaceId = "Drock::Model::Interface";
 const UniqueId Model::InterfaceDirectionId = "Drock::Model::Interface::Direction";
 const UniqueId Model::InterfaceTypeId = "Drock::Model::Interface::Type";
+const UniqueId Model::EdgeTypeId = "Drock::Model::Relation::Type";
 
 void Model::setupMetaModel()
 {
@@ -58,6 +59,11 @@ UniqueId Model::getDomainUid(const std::string& domain)
 UniqueId Model::getTypeUid(const std::string& type)
 {
     return Model::ComponentTypeId+"::"+type;
+}
+
+UniqueId Model::getEdgeUid(const std::string& type)
+{
+    return Model::EdgeTypeId+"::"+type;
 }
 
 UniqueId Model::getComponentUid(const std::string& domain, const std::string& name, const std::string& version)
@@ -164,6 +170,87 @@ bool Model::domainSpecificImport(const std::string& serialized)
             const YAML::Node& edges(components["edges"]);
             if (edges.IsDefined())
             {
+                for (auto eit = edges.begin(); eit != edges.end(); eit++)
+                {
+                    const YAML::Node& edge(*eit);
+                    const std::string& edgeName(edge["name"].as<std::string>());
+                    std::string edgeType("NOT_SET");
+                    if (edge["type"].IsDefined())
+                    {
+                        edgeType = edge["type"].as<std::string>();
+                    }
+                    const YAML::Node &from( edge["from"] );
+                    const YAML::Node &to( edge["to"] );
+                    if( !from.IsDefined() || !to.IsDefined() )
+                    {
+                        std::cout << "Edge " << edgeName << " has no to or from entry\n";
+                        continue;
+                    }
+                    const std::string& sourceNodeName(from["name"].as<std::string>());
+                    //const std::string& sourceNodeDomain(from["domain"].as<std::string>());
+                    const std::string& targetNodeName(to["name"].as<std::string>());
+                    //const std::string& targetNodeDomain(to["domain"].as<std::string>());
+                    // Check if edge is a true (interdomain) edge or a edge-connector-edge construct
+                    bool isInterDomainEdge = (edgeType == "NOT_SET" ? false : true);
+                    if (isInterDomainEdge)
+                    {
+                        // This edge is a relation which we can directly model.
+                        const UniqueId& relUid(getEdgeUid(edgeType));
+                        if (!get(relUid))
+                        {
+                            std::cout << "Don't know relation of type " << edgeType << "\n";
+                            continue;
+                        }
+                        // Get all facts from relUid by name
+                        Hyperedges factUids(factsOf(relUid, edgeName));
+                        // Lookup entities to relate from and to
+                        for (const UniqueId& fromUid : validNodeUids)
+                        {
+                            if (get(fromUid)->label() != sourceNodeName)
+                                continue;
+                            Hyperedges relsFromUids(relationsFrom(Hyperedges{fromUid}, edgeName));
+                            for (const UniqueId& toUid : validNodeUids)
+                            {
+                                if (get(toUid)->label() != targetNodeName)
+                                    continue;
+                                Hyperedges relsToUids(relationsTo(Hyperedges{toUid}, edgeName));
+                                Hyperedges possibleCandidateUids(intersect(factUids, intersect(relsFromUids, relsToUids)));
+                                if (!possibleCandidateUids.size())
+                                {
+                                    Hyperedges factUid(subtract(factFrom(Hyperedges{fromUid}, Hyperedges{toUid}, Hyperedges{relUid}), Hyperedges{fromUid, toUid}));
+                                    get(*factUid.begin())->updateLabel(edgeName);
+                                }
+                            }
+                        }
+                    } else {
+                        // These edges are based on interfaces. We can model them via ConnectedToInterfaceId.
+                        const std::string& sourceInterfaceName(from["interface"].as<std::string>());
+                        const std::string& targetInterfaceName(to["interface"].as<std::string>());
+                        // Get all facts from relUid by name
+                        Hyperedges factUids(factsOf(Component::Network::ConnectedToInterfaceId, edgeName));
+                        // Lookup entities to relate from and to
+                        for (const UniqueId& fromUid : validNodeUids)
+                        {
+                            if (get(fromUid)->label() != sourceNodeName)
+                                continue;
+                            Hyperedges fromInterfaceUids(interfacesOf(Hyperedges{fromUid}, sourceInterfaceName));
+                            Hyperedges relsFromUids(relationsFrom(fromInterfaceUids, edgeName));
+                            for (const UniqueId& toUid : validNodeUids)
+                            {
+                                if (get(toUid)->label() != targetNodeName)
+                                    continue;
+                                Hyperedges toInterfaceUids(interfacesOf(Hyperedges{toUid}, targetInterfaceName));
+                                Hyperedges relsToUids(relationsTo(toInterfaceUids, edgeName));
+                                Hyperedges possibleCandidateUids(intersect(factUids, intersect(relsFromUids, relsToUids)));
+                                if (!possibleCandidateUids.size())
+                                {
+                                    Hyperedges connUid(subtract(connectInterface(fromInterfaceUids, toInterfaceUids), unite(fromInterfaceUids, toInterfaceUids)));
+                                    get(*connUid.begin())->updateLabel(edgeName);
+                                }
+                            }
+                        }
+                    }
+                }
             }
             // TODO: Handle subcomponent config
         }
@@ -315,6 +402,50 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
                 nodesYAML.push_back(nodeYAML);
             }
             // For every pair of parts, we have to save the relations and interconnections as well.
+            YAML::Node edgesYAML(componentsYAML["edges"]);
+            for (const UniqueId& fromUid : partUids)
+            {
+                Hyperedges relsFromUids(relationsFrom(Hyperedges{fromUid}));
+                Hyperedges fromInterfaceUids(interfacesOf(Hyperedges{fromUid}));
+                for (const UniqueId& toUid : partUids)
+                {
+                    Hyperedges relsToUids(relationsTo(Hyperedges{toUid}));
+                    Hyperedges toInterfaceUids(interfacesOf(Hyperedges{toUid}));
+                    // First: store all normal relations
+                    Hyperedges commonRelUids(intersect(relsFromUids, relsToUids));
+                    for (const UniqueId& commonUid : commonRelUids)
+                    {
+                        YAML::Node edgeYAML;
+                        // TODO: Get and set type
+                        Hyperedges superRelUids(subrelationsOf(Hyperedges{commonUid}, "", TraversalDirection::DOWN));
+                        edgeYAML["name"] = get(commonUid)->label();
+                        edgeYAML["from"]["name"] = get(fromUid)->label();
+                        edgeYAML["to"]["name"] = get(toUid)->label();
+                        edgesYAML.push_back(edgeYAML);
+                    }
+                    // Second: store all connect relations between interfaces
+                    for (const UniqueId& fromInterfaceUid : fromInterfaceUids)
+                    {
+                        Hyperedges relsFromInterfaceUids(relationsFrom(Hyperedges{fromInterfaceUid}));
+                        for (const UniqueId& toInterfaceUid : toInterfaceUids)
+                        {
+                            Hyperedges relsToInterfaceUids(relationsTo(Hyperedges{toInterfaceUid}));
+                            Hyperedges commonInterfaceRelUids(intersect(relsFromInterfaceUids, relsToInterfaceUids));
+                            for (const UniqueId& commonUid : commonInterfaceRelUids)
+                            {
+                                YAML::Node edgeYAML;
+                                edgeYAML["name"] = get(commonUid)->label();
+                                edgeYAML["type"] = "NOT_SET";
+                                edgeYAML["from"]["name"] = get(fromUid)->label();
+                                edgeYAML["from"]["interface"] = get(fromInterfaceUid)->label();
+                                edgeYAML["to"]["name"] = get(toUid)->label();
+                                edgeYAML["to"]["interface"] = get(toInterfaceUid)->label();
+                                edgesYAML.push_back(edgeYAML);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         versionsYAML.push_back(versionYAML);

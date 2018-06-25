@@ -22,6 +22,7 @@ class Model : public Component::Network
         static const UniqueId InterfaceId;
         static const UniqueId InterfaceDirectionId;
         static const UniqueId InterfaceTypeId;
+        static const UniqueId EdgeTypeId;
 
         Model();
         Model(const Hypergraph& base);
@@ -35,6 +36,7 @@ class Model : public Component::Network
         UniqueId getTypeUid(const std::string& type);
         UniqueId getComponentUid(const std::string& domain, const std::string& name, const std::string& version="");
         UniqueId getInterfaceUid(const std::string& type, const std::string& direction);
+        UniqueId getEdgeUid(const std::string& type);
 
     protected:
         void setupMetaModel();
