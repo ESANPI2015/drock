@@ -15,11 +15,12 @@ static struct option long_options[] = {
 void usage (const char *myName)
 {
     std::cout << "Usage:\n";
-    std::cout << myName << " <yaml-file-in> <yaml-file-out>\n\n";
+    std::cout << myName << " <yaml-file-in> <yaml-file-out> (<yaml-file-in>)\n\n";
     std::cout << "Options:\n";
     std::cout << "--help\t" << "Show usage\n";
     std::cout << "\nExample:\n";
     std::cout << myName << "drock-basic-model-from-db.yml drock-domain-as-hypergraph.yml\n";
+    std::cout << myName << "drock-basic-model-from-db.yml drock-domain-as-hypergraph.yml other-hypergraph.yml\n";
 }
 
 // This tool takes a language definition and tries to interpret a given domain specific format given that definition
@@ -66,20 +67,42 @@ int main (int argc, char **argv)
     std::stringstream ss;
     ss << fin.rdbuf();
 
-    // Call domain specific import
-    Drock::Model dc;
-    dc.domainSpecificImport(ss.str());
+    if ((argc - optind) > 2)
+    {
+        std::string fileNameIn2(argv[optind+2]);
+        Hypergraph hg(YAML::LoadFile(fileNameIn2).as<Hypergraph>());
+        Drock::Model dc(hg);
 
-    // Store imported graph
-    std::ofstream fout;
-    fout.open(fileNameOut);
-    if(!fout.good()) {
-        std::cout << "WRITE FAILED\n";
-        return 3;
+        // Call domain specific import
+        dc.domainSpecificImport(ss.str());
+
+        // Store imported graph
+        std::ofstream fout;
+        fout.open(fileNameOut);
+        if(!fout.good()) {
+            std::cout << "WRITE FAILED\n";
+            return 3;
+        }
+        fout << YAML::StringFrom(dc) << std::endl;
+        fout.close();
+        fin.close();
+    } else {
+        Drock::Model dc;
+
+        // Call domain specific import
+        dc.domainSpecificImport(ss.str());
+
+        // Store imported graph
+        std::ofstream fout;
+        fout.open(fileNameOut);
+        if(!fout.good()) {
+            std::cout << "WRITE FAILED\n";
+            return 3;
+        }
+        fout << YAML::StringFrom(dc) << std::endl;
+        fout.close();
+        fin.close();
     }
-    fout << YAML::StringFrom(dc) << std::endl;
-    fout.close();
-    fin.close();
 
     return 0;
 }
