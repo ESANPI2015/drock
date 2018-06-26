@@ -303,7 +303,7 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
 
     // Find all superclasses of uid
     // This includes everything upwards (domain, type, etc.)
-    Hyperedges superUids(subclassesOf(uid, "", TraversalDirection::DOWN));
+    Hyperedges superUids(subclassesOf(uid, "", TraversalDirection::FORWARD));
 
     // Domains
     // NOTE: The domain could also be extracted from uid. But we want to be safe and query.
@@ -369,10 +369,10 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
         {
             YAML::Node interfaceYAML;
             interfaceYAML["name"] = get(ifId)->label();
-            Hyperedges superIfs(instancesOf(Hyperedges{ifId}, "", TraversalDirection::DOWN));
+            Hyperedges superIfs(instancesOf(Hyperedges{ifId}, "", TraversalDirection::FORWARD));
             for (const UniqueId& suid : superIfs)
             {
-                Hyperedges superSuperIfs(directSubclassesOf(Hyperedges{suid}, "", TraversalDirection::DOWN));
+                Hyperedges superSuperIfs(directSubclassesOf(Hyperedges{suid}, "", TraversalDirection::FORWARD));
                 interfaceYAML["type"] = get(*(intersect(superSuperIfs, ifTypeUids).begin()))->label();
                 interfaceYAML["direction"] = get(*(intersect(superSuperIfs, ifDirectionUids).begin()))->label();
                 interfacesYAML.push_back(interfaceYAML);
@@ -390,14 +390,14 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
                 YAML::Node nodeYAML;
                 nodeYAML["name"] = get(partUid)->label();
                 // the direct superclass is the model version
-                Hyperedges versionUids(instancesOf(Hyperedges{partUid}, "", TraversalDirection::DOWN));
+                Hyperedges versionUids(instancesOf(Hyperedges{partUid}, "", TraversalDirection::FORWARD));
                 nodeYAML["model"]["version"] = get(*versionUids.begin())->label();
                 // the next superclasses is the model itself (NOTE: get rid of the upper models)
-                Hyperedges modelUids(directSubclassesOf(versionUids, "", TraversalDirection::DOWN));
+                Hyperedges modelUids(directSubclassesOf(versionUids, "", TraversalDirection::FORWARD));
                 modelUids = subtract(modelUids, Hyperedges{Model::ComponentId, Component::Network::ComponentId});
                 nodeYAML["model"]["name"] = get(*modelUids.begin())->label();
                 // and the next superclasses are the type and the domain
-                Hyperedges modelDomainUids(intersect(directSubclassesOf(modelUids, "", TraversalDirection::DOWN), allDomainUids));
+                Hyperedges modelDomainUids(intersect(directSubclassesOf(modelUids, "", TraversalDirection::FORWARD), allDomainUids));
                 nodeYAML["model"]["domain"] = get(*modelDomainUids.begin())->label();
                 nodesYAML.push_back(nodeYAML);
             }
