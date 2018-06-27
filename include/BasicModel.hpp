@@ -23,6 +23,9 @@ class Model : public Component::Network
         static const UniqueId InterfaceDirectionId;
         static const UniqueId InterfaceTypeId;
         static const UniqueId EdgeTypeId;
+        static const UniqueId ConfigurationId;
+        static const UniqueId HasConfigId;
+        static const UniqueId AliasOfId;
 
         Model();
         Model(const Hypergraph& base);
@@ -37,6 +40,17 @@ class Model : public Component::Network
         UniqueId getComponentUid(const std::string& domain, const std::string& name, const std::string& version="");
         UniqueId getInterfaceUid(const std::string& type, const std::string& direction);
         UniqueId getEdgeUid(const std::string& type);
+
+        // Apply config
+        Hyperedges hasConfig(const Hyperedges& parentUids, const Hyperedges& childrenUids);
+        Hyperedges instantiateConfigOnce(const Hyperedges& parentUids, const std::string& label="");
+
+        // Query config
+        Hyperedges configsOf(const Hyperedges& uids, const std::string& label="");
+
+        // Create aliasPort
+        Hyperedges aliasOf(const Hyperedges& aliasInterfaceUids, const Hyperedges& originalInterfaceUids);
+        Hyperedges instantiateAliasInterfaceOnce(const Hyperedges& parentUids, const Hyperedges& interfaceUids, const std::string& label="");
 
     protected:
         void setupMetaModel();
