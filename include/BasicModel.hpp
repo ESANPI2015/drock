@@ -52,6 +52,9 @@ class Model : public Component::Network
         Hyperedges aliasOf(const Hyperedges& aliasInterfaceUids, const Hyperedges& originalInterfaceUids);
         Hyperedges instantiateAliasInterfaceOnce(const Hyperedges& parentUids, const Hyperedges& interfaceUids, const std::string& label="");
 
+        // Query original interfaces of alias interfaces
+        Hyperedges originalInterfaces(const Hyperedges& uids, const std::string& label="");
+
     protected:
         void setupMetaModel();
 };
