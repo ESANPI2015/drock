@@ -358,8 +358,6 @@ bool Model::domainSpecificImport(const std::string& serialized)
                             instantiateConfigOnce(Hyperedges{partUid}, nodeData);
                         }
 
-                        // TODO: If config exists (e.g. default config) we have to overlay it, right?
-                        
                         // TODO: Shall we follow the submodel chain? That means that we might have to use instantiateSuperDeepFrom!
                     }
                 }
@@ -378,8 +376,6 @@ bool Model::domainSpecificImport(const std::string& serialized)
                             // Found one, apply config
                             instantiateConfigOnce(Hyperedges{relUid}, edgeData);
                         }
-
-                        // TODO: If config exists (e.g. default config) we have to overlay it, right?
 
                         // TODO: Shall we follow the submodel chain? That means that we might have to use instantiateSuperDeepFrom!
                     }
@@ -661,11 +657,19 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
             }
         }
 
+        // Store default configuration
+        YAML::Node defaultConfigYAML(versionYAML["defaultConfiguration"]);
+        Hyperedges configUids(configsOf(Hyperedges{versionUid}));
+        for (const UniqueId& configUid : configUids)
+        {
+            YAML::Node configYAML;
+            configYAML["name"] = get(versionUid)->label();
+            configYAML["data"] = get(configUid)->label();
+            defaultConfigYAML.push_back(configYAML);
+        }
 
         versionsYAML.push_back(versionYAML);
     }
-
-    // TODO: Store config and other stuff
 
     ss << spec;
     return ss.str();
