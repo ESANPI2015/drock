@@ -635,9 +635,6 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
             Hyperedges aliasInterfaceUids(originalInterfaces(Hyperedges{ifId}));
             if (aliasInterfaceUids.size())
             {
-                interfaceYAML["linkToInterface"] = get(*aliasInterfaceUids.begin())->label();
-                Hyperedges ownerUids(interfacesOf(aliasInterfaceUids, "", TraversalDirection::INVERSE));
-                interfaceYAML["linkToNode"] = get(*ownerUids.begin())->label();
             }
             // handle interface type and direction
             for (const UniqueId& suid : superIfs)
@@ -645,7 +642,22 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
                 Hyperedges superSuperIfs(directSubclassesOf(Hyperedges{suid}, "", TraversalDirection::FORWARD));
                 interfaceYAML["type"] = get(*(intersect(superSuperIfs, ifTypeUids).begin()))->label();
                 interfaceYAML["direction"] = get(*(intersect(superSuperIfs, ifDirectionUids).begin()))->label();
-                interfacesYAML.push_back(interfaceYAML);
+                if (!aliasInterfaceUids.size())
+                {
+                    interfacesYAML.push_back(interfaceYAML);
+                    continue;
+                }
+                // Store alias interface info
+                for (const UniqueId& aliasUid : aliasInterfaceUids)
+                {
+                    interfaceYAML["linkToInterface"] = get(aliasUid)->label();
+                    Hyperedges ownerUids(interfacesOf(Hyperedges{aliasUid}, "", TraversalDirection::INVERSE));
+                    for (const UniqueId& ownerUid : ownerUids)
+                    {
+                        interfaceYAML["linkToNode"] = get(ownerUid)->label();
+                        interfacesYAML.push_back(interfaceYAML);
+                    }
+                }
             }
         }
 
