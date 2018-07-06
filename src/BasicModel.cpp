@@ -435,7 +435,7 @@ bool Model::domainSpecificImport(const std::string& serialized)
                 createInterface(superIfTypeUid, ifType, Hyperedges{Model::InterfaceTypeId});
                 // While the former classes are independent, the specific interface class from which we instantiate is dependent on BOTH
                 const UniqueId superIfUid(getInterfaceUid(ifType, ifDirection));
-                createInterface(superIfUid, superIfUid, Hyperedges{superIfDirUid, superIfTypeUid});
+                createInterface(superIfUid, ifName, Hyperedges{superIfDirUid, superIfTypeUid});
                 // Link to lower meta models TODO: Handle direction
                 if (inSoftwareDomain(domainUid))
                 {
