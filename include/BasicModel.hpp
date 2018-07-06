@@ -55,6 +55,11 @@ class Model : public Component::Network
         // Query original interfaces of alias interfaces
         Hyperedges originalInterfaces(const Hyperedges& uids, const std::string& label="");
 
+        // Check if we are in the SOFTWARE domain
+        bool inSoftwareDomain(const UniqueId& domainUid);
+        bool isInput(const UniqueId& interfaceDirUid);
+        bool isOutput(const UniqueId& interfaceDirUid);
+
     protected:
         void setupMetaModel();
 };

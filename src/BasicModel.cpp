@@ -3,6 +3,10 @@
 #include <iostream>
 #include <sstream>
 
+// Import other domains
+#include "SoftwareGraph.hpp"
+#include "HardwareComputationalNetwork.hpp"
+
 namespace Drock {
 
 const UniqueId Model::DomainId = "Drock::Model::Domain";
@@ -18,6 +22,12 @@ const UniqueId Model::AliasOfId = "Drock::Model::Relation::AliasOf";
 
 void Model::setupMetaModel()
 {
+    // Import meta models from other domains
+    Software::Graph sg;
+    Hardware::Computational::Network hcn;
+    importFrom(sg);
+    importFrom(hcn);
+    
     // Setup meta model
     // NOTE: We want to handle the basic model which is also stored in the DROCK DB ... therefore we will
     // NOT model the classes in the system_modelling library
@@ -42,8 +52,13 @@ void Model::setupMetaModel()
 
     // Create domain specific subrelations
     subrelationFrom(Model::HasConfigId, Hyperedges{Model::ComponentId, Model::EdgeTypeId}, Hyperedges{Model::ConfigurationId}, CommonConceptGraph::HasAId);
-    // Create aliasOf TODO: Move this to CommonConceptGraph?
+    // Create aliasOf
+    // TODO: Move to CommonConceptGraph
     relate(Model::AliasOfId, Hyperedges{Model::InterfaceId}, Hyperedges{Model::InterfaceId}, "ALIAS-OF");
+
+    // Predefine some known/expected domains
+    createSubclassOf(getDomainUid("SOFTWARE"), Hyperedges{Model::DomainId}, "SOFTWARE"); // all component models of the SOFTWARE domain can be Software::Graph::Algorithms
+    createSubclassOf(getDomainUid("COMPUTATION"), Hyperedges{Model::DomainId}, "COMPUTATION"); // all component models of the COMPUATION domain can be either a DEVICE, PROCESSOR or BUS
 }
 
 Model::Model()
@@ -59,6 +74,21 @@ Model::Model(const Hypergraph& base)
 
 Model::~Model()
 {
+}
+
+bool Model::isInput(const UniqueId& interfaceDirUid)
+{
+    return ((interfaceDirUid == getInterfaceUid("","INCOMING")) || (interfaceDirUid == getInterfaceUid("","BIDIRECTIONAL")) ? true : false);
+}
+
+bool Model::isOutput(const UniqueId& interfaceDirUid)
+{
+    return ((interfaceDirUid == getInterfaceUid("","OUTGOING")) || (interfaceDirUid == getInterfaceUid("","BIDIRECTIONAL")) ? true : false);
+}
+
+bool Model::inSoftwareDomain(const UniqueId& domainUid)
+{
+    return (domainUid == getDomainUid("SOFTWARE") ? true : false);
 }
 
 UniqueId Model::getDomainUid(const std::string& domain)
@@ -192,6 +222,9 @@ bool Model::domainSpecificImport(const std::string& serialized)
     const UniqueId superUid(getComponentUid(domain, name));
     createComponent(superUid, name, Hyperedges{typeUid});
     isA(Hyperedges{superUid}, Hyperedges{domainUid});
+    // Link to lower meta models
+    if (inSoftwareDomain(domainUid))
+        isA(Hyperedges{superUid}, Hyperedges{Software::Graph::AlgorithmId});
     // For each of the versions we have to create a new component
     // The question is: Do we create a subclass for each version? Or do we just use names?
     // We should do the former.
@@ -403,6 +436,17 @@ bool Model::domainSpecificImport(const std::string& serialized)
                 // While the former classes are independent, the specific interface class from which we instantiate is dependent on BOTH
                 const UniqueId superIfUid(getInterfaceUid(ifType, ifDirection));
                 createInterface(superIfUid, superIfUid, Hyperedges{superIfDirUid, superIfTypeUid});
+                // Link to lower meta models TODO: Handle direction
+                if (inSoftwareDomain(domainUid))
+                {
+                    isA(Hyperedges{superIfUid}, Hyperedges{Software::Graph::InterfaceId});
+                    // FIXME: The direction of the IS-A relation between Software::Graph::Datatype and Software::Graph::Interface is shitty
+                    isA(Hyperedges{superIfTypeUid}, Hyperedges{Software::Graph::DatatypeId, superIfUid});
+                    if (isInput(superIfDirUid))
+                        isA(Hyperedges{superIfUid}, Hyperedges{Software::Graph::InputId});
+                    if (isOutput(superIfDirUid))
+                        isA(Hyperedges{superIfUid}, Hyperedges{Software::Graph::OutputId});
+                }
 
                 // Get alias information
                 std::string interfaceLinkNodeName;
