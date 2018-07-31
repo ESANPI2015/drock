@@ -51,7 +51,7 @@ void Model::setupMetaModel()
     createInterface(Model::InterfaceTypeId, "Type", Hyperedges{Model::InterfaceId});
 
     // Create domain specific subrelations
-    subrelationFrom(Model::HasConfigId, Hyperedges{Model::ComponentId, Model::EdgeTypeId}, Hyperedges{Model::ConfigurationId}, CommonConceptGraph::HasAId);
+    subrelationFrom(Model::HasConfigId, Hyperedges{Model::ComponentId}, Hyperedges{Model::ConfigurationId}, CommonConceptGraph::HasAId);
     // Create aliasOf
     // TODO: Move to CommonConceptGraph
     relate(Model::AliasOfId, Hyperedges{Model::InterfaceId}, Hyperedges{Model::InterfaceId}, "ALIAS-OF");
@@ -130,7 +130,15 @@ UniqueId Model::getInterfaceUid(const std::string& type, const std::string& dire
 
 Hyperedges Model::aliasOf(const Hyperedges& aliasInterfaceUids, const Hyperedges& originalInterfaceUids)
 {
-    return factFrom(aliasInterfaceUids, originalInterfaceUids, Model::AliasOfId);
+    Hyperedges result;
+    for (const UniqueId& aliasId : aliasInterfaceUids)
+    {
+        for (const UniqueId& originalId : originalInterfaceUids)
+        {
+            result = unite(result, factFrom(Hyperedges{aliasId}, Hyperedges{originalId}, Model::AliasOfId));
+        }
+    }
+    return result;
 }
 
 Hyperedges Model::instantiateAliasInterfaceOnce(const Hyperedges& parentUids, const Hyperedges& interfaceUids, const std::string& label)
@@ -185,7 +193,15 @@ Hyperedges Model::instantiateConfigOnce(const Hyperedges& parentUids, const std:
 
 Hyperedges Model::hasConfig(const Hyperedges& parentUids, const Hyperedges& childrenUids)
 {
-    return factFrom(parentUids, childrenUids, Model::HasConfigId);
+    Hyperedges result;
+    for (const UniqueId& parentId : parentUids)
+    {
+        for (const UniqueId& childId : childrenUids)
+        {
+            result = unite(result, factFrom(Hyperedges{parentId}, Hyperedges{childId}, Model::HasConfigId));
+        }
+    }
+    return result;
 }
 
 Hyperedges Model::configsOf(const Hyperedges& uids, const std::string& label)
@@ -328,7 +344,7 @@ bool Model::domainSpecificImport(const std::string& serialized)
                                 Hyperedges possibleCandidateUids(intersect(factUids, intersect(relsFromUids, relsToUids)));
                                 if (!possibleCandidateUids.size())
                                 {
-                                    Hyperedges factUid(subtract(factFrom(Hyperedges{fromUid}, Hyperedges{toUid}, Hyperedges{relUid}), Hyperedges{fromUid, toUid}));
+                                    Hyperedges factUid(factFrom(Hyperedges{fromUid}, Hyperedges{toUid}, Hyperedges{relUid}));
                                     get(*factUid.begin())->updateLabel(edgeName);
                                     possibleCandidateUids = unite(possibleCandidateUids, factUid);
                                 }
@@ -358,9 +374,10 @@ bool Model::domainSpecificImport(const std::string& serialized)
                                 Hyperedges possibleCandidateUids(intersect(factUids, intersect(relsFromUids, relsToUids)));
                                 if (!possibleCandidateUids.size())
                                 {
-                                    Hyperedges connUid(subtract(connectInterface(fromInterfaceUids, toInterfaceUids), unite(fromInterfaceUids, toInterfaceUids)));
-                                    get(*connUid.begin())->updateLabel(edgeName);
-                                    possibleCandidateUids = unite(possibleCandidateUids, connUid);
+                                    Hyperedges connUids(connectInterface(fromInterfaceUids, toInterfaceUids));
+                                    for (const UniqueId& connUid : connUids)
+                                        get(connUid)->updateLabel(edgeName);
+                                    possibleCandidateUids = unite(possibleCandidateUids, connUids);
                                 }
                                 // Register (possibly new) edges for later use
                                 validEdgeUids = unite(validEdgeUids, possibleCandidateUids);
