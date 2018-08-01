@@ -18,7 +18,6 @@ const UniqueId Model::InterfaceTypeId = "Drock::Model::Interface::Type";
 const UniqueId Model::EdgeTypeId = "Drock::Model::Relation";
 const UniqueId Model::ConfigurationId = "Drock::Model::Configuration";
 const UniqueId Model::HasConfigId = "Drock::Model::Relation::HasConfig";
-const UniqueId Model::AliasOfId = "Drock::Model::Relation::AliasOf";
 
 void Model::setupMetaModel()
 {
@@ -52,10 +51,6 @@ void Model::setupMetaModel()
 
     // Create domain specific subrelations
     subrelationFrom(Model::HasConfigId, Hyperedges{Model::ComponentId}, Hyperedges{Model::ConfigurationId}, CommonConceptGraph::HasAId);
-    // Create aliasOf
-    // TODO: Move to CommonConceptGraph
-    relate(Model::AliasOfId, Hyperedges{Model::InterfaceId}, Hyperedges{Model::InterfaceId}, "ALIAS-OF");
-
     // Predefine some known/expected domains
     createSubclassOf(getDomainUid("SOFTWARE"), Hyperedges{Model::DomainId}, "SOFTWARE"); // all component models of the SOFTWARE domain can be Software::Graph::Algorithms
     createSubclassOf(getDomainUid("COMPUTATION"), Hyperedges{Model::DomainId}, "COMPUTATION"); // all component models of the COMPUATION domain can be either a DEVICE, PROCESSOR or BUS
@@ -126,45 +121,6 @@ UniqueId Model::getInterfaceUid(const std::string& type, const std::string& dire
         valid = true;
     }
     return valid ? uid : "";
-}
-
-Hyperedges Model::aliasOf(const Hyperedges& aliasInterfaceUids, const Hyperedges& originalInterfaceUids)
-{
-    Hyperedges result;
-    for (const UniqueId& aliasId : aliasInterfaceUids)
-    {
-        for (const UniqueId& originalId : originalInterfaceUids)
-        {
-            result = unite(result, factFrom(Hyperedges{aliasId}, Hyperedges{originalId}, Model::AliasOfId));
-        }
-    }
-    return result;
-}
-
-Hyperedges Model::instantiateAliasInterfaceOnce(const Hyperedges& parentUids, const Hyperedges& interfaceUids, const std::string& label)
-{
-    Hyperedges result;
-    for (const UniqueId& parentUid : parentUids)
-    {
-        Hyperedges existingIfUids(interfacesOf(Hyperedges{parentUid}, label));
-        if (!existingIfUids.size())
-        {
-            Hyperedges newInterfaceUids(instantiateAnother(interfaceUids, label));
-            hasInterface(Hyperedges{parentUid}, newInterfaceUids);
-            aliasOf(newInterfaceUids, interfaceUids);
-            result = unite(result, newInterfaceUids);
-        }
-    }
-    return result;
-}
-
-Hyperedges Model::originalInterfaces(const Hyperedges& uids, const std::string& label)
-{
-    // Get all uids <-- ALIAS-OF --> X,label and return the X
-    Hyperedges factUids(factsOf(Hyperedges{Model::AliasOfId}));
-    Hyperedges relsFromUids(relationsFrom(uids));
-    Hyperedges matches(intersect(factUids, relsFromUids));
-    return to(matches, label);
 }
 
 Hyperedges Model::instantiateConfigOnce(const Hyperedges& parentUids, const std::string& label)
@@ -445,6 +401,14 @@ bool Model::domainSpecificImport(const std::string& serialized)
                 const std::string& ifType(interfaceYAML["type"].as<std::string>());
                 const std::string& ifDirection(interfaceYAML["direction"].as<std::string>());
 
+                // Check if interface already exists.
+                Hyperedges interfaceUids(interfacesOf(Hyperedges{modelUid}, ifName));
+                if (interfaceUids.size())
+                {
+                    // Interface already exists, so ignore it.
+                    continue;
+                }
+
                 // Create one subclass of Drock::Interface which encodes directionality and one for the type
                 const UniqueId superIfDirUid(getInterfaceUid("",ifDirection));
                 createInterface(superIfDirUid, ifDirection, Hyperedges{Model::InterfaceDirectionId});
@@ -483,15 +447,11 @@ bool Model::domainSpecificImport(const std::string& serialized)
                             continue;
                         // Found. Find all interfaces with given name.
                         Hyperedges interfaceUids(interfacesOf(Hyperedges{partUid}, interfaceLinkInterfaceName));
-                        allInterfaces = unite(allInterfaces, instantiateAliasInterfaceOnce(Hyperedges{modelUid}, interfaceUids, ifName));
+                        allInterfaces = unite(allInterfaces, instantiateAliasInterfaceFor(Hyperedges{modelUid}, interfaceUids, ifName));
                     }
                 } else {
-                    Hyperedges interfaceUids(interfacesOf(Hyperedges{modelUid}, ifName));
-                    if (!interfaceUids.size())
-                    {
-                        // Create interface
-                        allInterfaces = unite(allInterfaces, instantiateInterfaceFor(Hyperedges{modelUid}, Hyperedges{superIfUid}, ifName));
-                    }
+                    // Create normal interface
+                    allInterfaces = unite(allInterfaces, instantiateInterfaceFor(Hyperedges{modelUid}, Hyperedges{superIfUid}, ifName));
                 }
             }
         }
@@ -688,27 +648,24 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
             YAML::Node interfaceYAML;
             interfaceYAML["name"] = get(ifId)->label();
             Hyperedges superIfs(instancesOf(Hyperedges{ifId}, "", TraversalDirection::FORWARD));
-            // Check if there is an alias interface
-            Hyperedges aliasInterfaceUids(originalInterfaces(Hyperedges{ifId}));
-            if (aliasInterfaceUids.size())
-            {
-            }
+            // Check if it is an alias interface
+            Hyperedges originalInterfaceUids(originalInterfacesOf(Hyperedges{ifId}));
             // handle interface type and direction
             for (const UniqueId& suid : superIfs)
             {
                 Hyperedges superSuperIfs(directSubclassesOf(Hyperedges{suid}, "", TraversalDirection::FORWARD));
                 interfaceYAML["type"] = get(*(intersect(superSuperIfs, ifTypeUids).begin()))->label();
                 interfaceYAML["direction"] = get(*(intersect(superSuperIfs, ifDirectionUids).begin()))->label();
-                if (!aliasInterfaceUids.size())
+                if (!originalInterfaceUids.size())
                 {
                     interfacesYAML.push_back(interfaceYAML);
                     continue;
                 }
                 // Store alias interface info
-                for (const UniqueId& aliasUid : aliasInterfaceUids)
+                for (const UniqueId& originalInterfaceUid : originalInterfaceUids)
                 {
-                    interfaceYAML["linkToInterface"] = get(aliasUid)->label();
-                    Hyperedges ownerUids(interfacesOf(Hyperedges{aliasUid}, "", TraversalDirection::INVERSE));
+                    interfaceYAML["linkToInterface"] = get(originalInterfaceUid)->label();
+                    Hyperedges ownerUids(interfacesOf(Hyperedges{originalInterfaceUid}, "", TraversalDirection::INVERSE));
                     for (const UniqueId& ownerUid : ownerUids)
                     {
                         interfaceYAML["linkToNode"] = get(ownerUid)->label();

@@ -5,13 +5,6 @@
 
 namespace Drock {
 
-// TODO: Actually this class encodes already Hardware::Computational::Network & Software::Graph
-// We should either inherit from both (diamond shape :]) OR at least make links to both meta models
-//
-// TODO: Instead of using namespacing to set/get information about the basic model
-// we should create metaclasses to specify types.
-// Then we can also make use of the nice things of conceptual graphs, namely multiple inheritance/types
-
 class Model : public Component::Network
 {
     public:
@@ -25,7 +18,6 @@ class Model : public Component::Network
         static const UniqueId EdgeTypeId;
         static const UniqueId ConfigurationId;
         static const UniqueId HasConfigId;
-        static const UniqueId AliasOfId;
 
         Model();
         Model(const Hypergraph& base);
@@ -47,13 +39,6 @@ class Model : public Component::Network
 
         // Query config
         Hyperedges configsOf(const Hyperedges& uids, const std::string& label="");
-
-        // Create aliasPort
-        Hyperedges aliasOf(const Hyperedges& aliasInterfaceUids, const Hyperedges& originalInterfaceUids);
-        Hyperedges instantiateAliasInterfaceOnce(const Hyperedges& parentUids, const Hyperedges& interfaceUids, const std::string& label="");
-
-        // Query original interfaces of alias interfaces
-        Hyperedges originalInterfaces(const Hyperedges& uids, const std::string& label="");
 
         // Check if we are in the SOFTWARE domain
         bool inSoftwareDomain(const UniqueId& domainUid);
