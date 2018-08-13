@@ -417,12 +417,11 @@ bool Model::domainSpecificImport(const std::string& serialized)
                 // While the former classes are independent, the specific interface class from which we instantiate is dependent on BOTH
                 const UniqueId superIfUid(getInterfaceUid(ifType, ifDirection));
                 createInterface(superIfUid, ifName, Hyperedges{superIfDirUid, superIfTypeUid});
-                // Link to lower meta models TODO: Handle direction
+                // Link to lower meta models 
                 if (inSoftwareDomain(domainUid))
                 {
                     isA(Hyperedges{superIfUid}, Hyperedges{Software::Graph::InterfaceId});
-                    // FIXME: The direction of the IS-A relation between Software::Graph::Datatype and Software::Graph::Interface is shitty
-                    isA(Hyperedges{superIfTypeUid}, Hyperedges{Software::Graph::DatatypeId, superIfUid});
+                    isA(Hyperedges{superIfTypeUid}, Hyperedges{superIfUid});
                     if (isInput(superIfDirUid))
                         isA(Hyperedges{superIfUid}, Hyperedges{Software::Graph::InputId});
                     if (isOutput(superIfDirUid))
