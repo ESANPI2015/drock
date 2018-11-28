@@ -141,7 +141,7 @@ Hyperedges Model::instantiateConfigOnce(const Hyperedges& parentUids, const std:
         // NOTE: Maybe we should extend the label by concatenation?
         for (const UniqueId& configUid : existingConfigUids)
         {
-            get(configUid)->updateLabel(label);
+            get(configUid).updateLabel(label);
         }
     }
     return result;
@@ -235,7 +235,7 @@ bool Model::domainSpecificImport(const std::string& serialized)
                         // Instantiate new subcomponent
                         // We need to find a component class named <nodeModelVersion> whose superclass is <nodeModelName> and its domain is <nodeModelDomain>
                         const UniqueId templateUid(getComponentUid(nodeModelDomain, nodeModelName, nodeModelVersion));
-                        if (!get(templateUid))
+                        if (!exists(templateUid))
                         {
                             std::cout << "Cannot find model " << templateUid << " for " << nodeName << "\n";
                             continue;
@@ -279,7 +279,7 @@ bool Model::domainSpecificImport(const std::string& serialized)
                     {
                         // This edge is a relation which we can directly model.
                         const UniqueId& relUid(getEdgeUid(edgeType));
-                        if (!get(relUid))
+                        if (!exists(relUid))
                         {
                             std::cout << "Don't know relation of type " << edgeType << "\n";
                             continue;
@@ -289,19 +289,19 @@ bool Model::domainSpecificImport(const std::string& serialized)
                         // Lookup entities to relate from and to
                         for (const UniqueId& fromUid : validNodeUids)
                         {
-                            if (get(fromUid)->label() != sourceNodeName)
+                            if (read(fromUid).label() != sourceNodeName)
                                 continue;
                             Hyperedges relsFromUids(relationsFrom(Hyperedges{fromUid}, edgeName));
                             for (const UniqueId& toUid : validNodeUids)
                             {
-                                if (get(toUid)->label() != targetNodeName)
+                                if (read(toUid).label() != targetNodeName)
                                     continue;
                                 Hyperedges relsToUids(relationsTo(Hyperedges{toUid}, edgeName));
                                 Hyperedges possibleCandidateUids(intersect(factUids, intersect(relsFromUids, relsToUids)));
                                 if (!possibleCandidateUids.size())
                                 {
                                     Hyperedges factUid(factFrom(Hyperedges{fromUid}, Hyperedges{toUid}, Hyperedges{relUid}));
-                                    get(*factUid.begin())->updateLabel(edgeName);
+                                    get(*factUid.begin()).updateLabel(edgeName);
                                     possibleCandidateUids = unite(possibleCandidateUids, factUid);
                                 }
                                 // Register (possibly new) edges for later use
@@ -317,13 +317,13 @@ bool Model::domainSpecificImport(const std::string& serialized)
                         // Lookup entities to relate from and to
                         for (const UniqueId& fromUid : validNodeUids)
                         {
-                            if (get(fromUid)->label() != sourceNodeName)
+                            if (read(fromUid).label() != sourceNodeName)
                                 continue;
                             Hyperedges fromInterfaceUids(interfacesOf(Hyperedges{fromUid}, sourceInterfaceName));
                             Hyperedges relsFromUids(relationsFrom(fromInterfaceUids, edgeName));
                             for (const UniqueId& toUid : validNodeUids)
                             {
-                                if (get(toUid)->label() != targetNodeName)
+                                if (read(toUid).label() != targetNodeName)
                                     continue;
                                 Hyperedges toInterfaceUids(interfacesOf(Hyperedges{toUid}, targetInterfaceName));
                                 Hyperedges relsToUids(relationsTo(toInterfaceUids, edgeName));
@@ -332,7 +332,7 @@ bool Model::domainSpecificImport(const std::string& serialized)
                                 {
                                     Hyperedges connUids(connectInterface(fromInterfaceUids, toInterfaceUids));
                                     for (const UniqueId& connUid : connUids)
-                                        get(connUid)->updateLabel(edgeName);
+                                        get(connUid).updateLabel(edgeName);
                                     possibleCandidateUids = unite(possibleCandidateUids, connUids);
                                 }
                                 // Register (possibly new) edges for later use
@@ -358,7 +358,7 @@ bool Model::domainSpecificImport(const std::string& serialized)
                         // Find the node! It is somewhere in the parts ...
                         for (const UniqueId& partUid : validNodeUids)
                         {
-                            if (get(partUid)->label() != nodeName)
+                            if (read(partUid).label() != nodeName)
                                 continue;
                             // Found one, apply config
                             instantiateConfigOnce(Hyperedges{partUid}, nodeData);
@@ -377,7 +377,7 @@ bool Model::domainSpecificImport(const std::string& serialized)
                         // Find the realtion. It is somewhere in the edges
                         for (const UniqueId& relUid : validEdgeUids)
                         {
-                            if (get(relUid)->label() != edgeName)
+                            if (read(relUid).label() != edgeName)
                                 continue;
                             // Found one, apply config
                             instantiateConfigOnce(Hyperedges{relUid}, edgeData);
@@ -442,7 +442,7 @@ bool Model::domainSpecificImport(const std::string& serialized)
                     // Find node somwhere in parts
                     for (const UniqueId& partUid : validNodeUids)
                     {
-                        if (get(partUid)->label() != interfaceLinkNodeName)
+                        if (read(partUid).label() != interfaceLinkNodeName)
                             continue;
                         // Found. Find all interfaces with given name.
                         Hyperedges interfaceUids(interfacesOf(Hyperedges{partUid}, interfaceLinkInterfaceName));
@@ -474,7 +474,7 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
 {
     std::stringstream ss;
     YAML::Node spec;
-    if (!get(uid))
+    if (!exists(uid))
         return std::string();
 
     // Find all superclasses of uid
@@ -495,7 +495,7 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
         std::cout << "No domain found. Abort\n";
         return ss.str();
     }
-    spec["domain"] = get(*domainUids.begin())->label();
+    spec["domain"] = read(*domainUids.begin()).label();
 
     // Types
     Hyperedges allTypeUids(directSubclassesOf(Hyperedges{Model::ComponentTypeId}));
@@ -510,7 +510,7 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
         std::cout << "No type found. Abort\n";
         return ss.str();
     }
-    spec["type"] = get(*typeUids.begin())->label();
+    spec["type"] = read(*typeUids.begin()).label();
 
     // Components
     Hyperedges allComponentUids(directSubclassesOf(typeUids));
@@ -525,7 +525,7 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
         std::cout << "No component found. Abort\n";
         return ss.str();
     }
-    spec["name"] = get(*componentUids.begin())->label();
+    spec["name"] = read(*componentUids.begin()).label();
 
     // For later: Get all interface type and direction uids
     Hyperedges ifTypeUids(directSubclassesOf(Hyperedges{Model::InterfaceTypeId}));
@@ -536,7 +536,7 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
     for (const UniqueId& versionUid : allVersions)
     {
         YAML::Node versionYAML;
-        versionYAML["name"] = get(versionUid)->label();
+        versionYAML["name"] = read(versionUid).label();
 
         // Handle subcomponents
         YAML::Node componentsYAML(versionYAML["components"]);
@@ -549,17 +549,17 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
             for (const UniqueId& partUid : partUids)
             {
                 YAML::Node nodeYAML;
-                nodeYAML["name"] = get(partUid)->label();
+                nodeYAML["name"] = read(partUid).label();
                 // the direct superclass is the model version
                 Hyperedges versionUids(instancesOf(Hyperedges{partUid}, "", TraversalDirection::FORWARD));
-                nodeYAML["model"]["version"] = get(*versionUids.begin())->label();
+                nodeYAML["model"]["version"] = read(*versionUids.begin()).label();
                 // the next superclasses is the model itself (NOTE: get rid of the upper models)
                 Hyperedges modelUids(directSubclassesOf(versionUids, "", TraversalDirection::FORWARD));
                 modelUids = subtract(modelUids, Hyperedges{Model::ComponentId, Component::Network::ComponentId});
-                nodeYAML["model"]["name"] = get(*modelUids.begin())->label();
+                nodeYAML["model"]["name"] = read(*modelUids.begin()).label();
                 // and the next superclasses are the type and the domain
                 Hyperedges modelDomainUids(intersect(directSubclassesOf(modelUids, "", TraversalDirection::FORWARD), allDomainUids));
-                nodeYAML["model"]["domain"] = get(*modelDomainUids.begin())->label();
+                nodeYAML["model"]["domain"] = read(*modelDomainUids.begin()).label();
                 nodesYAML.push_back(nodeYAML);
 
                 // Get configurations
@@ -567,8 +567,8 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
                 for (const UniqueId& configUid : configUids)
                 {
                     YAML::Node nodeConfigYAML;
-                    nodeConfigYAML["name"] = get(partUid)->label();
-                    nodeConfigYAML["data"] = get(configUid)->label();
+                    nodeConfigYAML["name"] = read(partUid).label();
+                    nodeConfigYAML["data"] = read(configUid).label();
                     nodeConfigsYAML.push_back(nodeConfigYAML);
                 }
             }
@@ -590,18 +590,18 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
                         YAML::Node edgeYAML;
                         // Find type
                         Hyperedges edgeTypeUids(factsOf(Hyperedges{commonUid}, "", TraversalDirection::FORWARD));
-                        edgeYAML["type"] = get(*edgeTypeUids.begin())->label();
-                        edgeYAML["name"] = get(commonUid)->label();
-                        edgeYAML["from"]["name"] = get(fromUid)->label();
-                        edgeYAML["to"]["name"] = get(toUid)->label();
+                        edgeYAML["type"] = read(*edgeTypeUids.begin()).label();
+                        edgeYAML["name"] = read(commonUid).label();
+                        edgeYAML["from"]["name"] = read(fromUid).label();
+                        edgeYAML["to"]["name"] = read(toUid).label();
                         edgesYAML.push_back(edgeYAML);
                         // Get configurations
                         Hyperedges configUids(configsOf(Hyperedges{commonUid}));
                         for (const UniqueId& configUid : configUids)
                         {
                             YAML::Node edgeConfigYAML;
-                            edgeConfigYAML["name"] = get(commonUid)->label();
-                            edgeConfigYAML["data"] = get(configUid)->label();
+                            edgeConfigYAML["name"] = read(commonUid).label();
+                            edgeConfigYAML["data"] = read(configUid).label();
                             edgeConfigsYAML.push_back(edgeConfigYAML);
                         }
                     }
@@ -616,20 +616,20 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
                             for (const UniqueId& commonUid : commonInterfaceRelUids)
                             {
                                 YAML::Node edgeYAML;
-                                edgeYAML["name"] = get(commonUid)->label();
+                                edgeYAML["name"] = read(commonUid).label();
                                 edgeYAML["type"] = "NOT_SET";
-                                edgeYAML["from"]["name"] = get(fromUid)->label();
-                                edgeYAML["from"]["interface"] = get(fromInterfaceUid)->label();
-                                edgeYAML["to"]["name"] = get(toUid)->label();
-                                edgeYAML["to"]["interface"] = get(toInterfaceUid)->label();
+                                edgeYAML["from"]["name"] = read(fromUid).label();
+                                edgeYAML["from"]["interface"] = read(fromInterfaceUid).label();
+                                edgeYAML["to"]["name"] = read(toUid).label();
+                                edgeYAML["to"]["interface"] = read(toInterfaceUid).label();
                                 edgesYAML.push_back(edgeYAML);
                                 // Get configurations
                                 Hyperedges configUids(configsOf(Hyperedges{commonUid}));
                                 for (const UniqueId& configUid : configUids)
                                 {
                                     YAML::Node edgeConfigYAML;
-                                    edgeConfigYAML["name"] = get(commonUid)->label();
-                                    edgeConfigYAML["data"] = get(configUid)->label();
+                                    edgeConfigYAML["name"] = read(commonUid).label();
+                                    edgeConfigYAML["data"] = read(configUid).label();
                                     edgeConfigsYAML.push_back(edgeConfigYAML);
                                 }
                             }
@@ -645,7 +645,7 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
         for (const UniqueId& ifId : ifs)
         {
             YAML::Node interfaceYAML;
-            interfaceYAML["name"] = get(ifId)->label();
+            interfaceYAML["name"] = read(ifId).label();
             Hyperedges superIfs(instancesOf(Hyperedges{ifId}, "", TraversalDirection::FORWARD));
             // Check if it is an alias interface
             Hyperedges originalInterfaceUids(originalInterfacesOf(Hyperedges{ifId}));
@@ -653,8 +653,8 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
             for (const UniqueId& suid : superIfs)
             {
                 Hyperedges superSuperIfs(directSubclassesOf(Hyperedges{suid}, "", TraversalDirection::FORWARD));
-                interfaceYAML["type"] = get(*(intersect(superSuperIfs, ifTypeUids).begin()))->label();
-                interfaceYAML["direction"] = get(*(intersect(superSuperIfs, ifDirectionUids).begin()))->label();
+                interfaceYAML["type"] = read(*(intersect(superSuperIfs, ifTypeUids).begin())).label();
+                interfaceYAML["direction"] = read(*(intersect(superSuperIfs, ifDirectionUids).begin())).label();
                 if (!originalInterfaceUids.size())
                 {
                     interfacesYAML.push_back(interfaceYAML);
@@ -663,11 +663,11 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
                 // Store alias interface info
                 for (const UniqueId& originalInterfaceUid : originalInterfaceUids)
                 {
-                    interfaceYAML["linkToInterface"] = get(originalInterfaceUid)->label();
+                    interfaceYAML["linkToInterface"] = read(originalInterfaceUid).label();
                     Hyperedges ownerUids(interfacesOf(Hyperedges{originalInterfaceUid}, "", TraversalDirection::INVERSE));
                     for (const UniqueId& ownerUid : ownerUids)
                     {
-                        interfaceYAML["linkToNode"] = get(ownerUid)->label();
+                        interfaceYAML["linkToNode"] = read(ownerUid).label();
                         interfacesYAML.push_back(interfaceYAML);
                     }
                 }
@@ -680,8 +680,8 @@ std::string Model::domainSpecificExport(const UniqueId& uid)
         for (const UniqueId& configUid : configUids)
         {
             YAML::Node configYAML;
-            configYAML["name"] = get(versionUid)->label();
-            configYAML["data"] = get(configUid)->label();
+            configYAML["name"] = read(versionUid).label();
+            configYAML["data"] = read(configUid).label();
             defaultConfigYAML.push_back(configYAML);
         }
 
